@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+  <div class="container">
+    <div class="topbar">
+      <div>
+        <h1>Admin Dashboard</h1>
+        <p id="welcomeText" style="color: var(--ink-soft); font-size: 13px; margin-top: 2px;"></p>
+      </div>
+      <button onclick="logout()">Logout</button>
+    </div>
+
+    <!-- Create single user (tutor / HOD / admin / student) -->
+    <div class="card">
+      <h2>Create single account</h2>
+      <div id="createError" class="error"></div>
+      <form id="createUserForm">
+        <input type="text" id="name" placeholder="Full name" required />
+        <input type="email" id="email" placeholder="Email" required />
+        <input type="password" id="password" placeholder="Password" required />
+        <select id="role" required>
+          <option value="">Select role</option>
+          <option value="student">Student</option>
+          <option value="class_tutor">Class Tutor</option>
+          <option value="hod">HOD</option>
+          <option value="admin">Admin</option>
+        </select>
+        <input type="text" id="department" placeholder="Department (e.g. CSE)" required />
+        <input type="text" id="className" placeholder="Class (e.g. CSE-A) — required for student/tutor" />
+        <input type="text" id="regNo" placeholder="Register number — required for students" />
+        <input type="text" id="parentName" placeholder="Parent name (students only)" />
+        <input type="text" id="parentPhone" placeholder="Parent phone (students only)" />
+        <button type="submit">Create account</button>
+      </form>
+    </div>
+
+    <!-- Bulk add students -->
+    <div class="card">
+      <h2>Bulk add students</h2>
+
+      <p style="font-size:13px; color:#666; margin-bottom:10px;">
+        <strong>Option A — Upload a CSV or Excel file.</strong> Columns in this exact order (with header row):
+        <br/><code>Name, RegisterNumber, Email, ParentName, ParentPhone, Department, Class</code>
+      </p>
+
+      <div id="fileImportError" class="error"></div>
+      <input type="file" id="studentFileInput" accept=".csv,.xlsx,.xls" />
+      <button type="button" onclick="handleFileImport()">Import from file</button>
+
+      <div id="fileImportPreview" style="margin-top:10px; font-size:13px;"></div>
+
+      <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--hairline);" />
+
+      <p style="font-size:13px; color:#666; margin-bottom:10px;">
+        <strong>Option B — Paste manually.</strong> Set a common department and class below, then paste one student per line:
+        <br/><code>Name, RegisterNumber, Email, ParentName, ParentPhone</code>
+        <br/>Each student's initial password will be their register number.
+      </p>
+
+      <div id="bulkError" class="error"></div>
+
+      <input type="text" id="bulkDepartment" placeholder="Department (e.g. CSE)" />
+      <input type="text" id="bulkClassName" placeholder="Class (e.g. CSE-A)" />
+
+      <textarea id="bulkStudents" rows="8" placeholder="Arun Kumar, 21CSE045, arun@college.edu, Ravi Kumar, 9876543210
+Divya S, 21CSE046, divya@college.edu, Suresh S, 9876543211"></textarea>
+
+      <button type="button" onclick="submitBulkStudents()">Add pasted students</button>
+
+      <div id="bulkResult" style="margin-top:10px; font-size:13px;"></div>
+    </div>
+
+    <!-- All users table -->
+    <div class="card">
+      <h2>All users</h2>
+
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap: wrap;">
+        <select id="roleFilter" onchange="loadUsers()" style="width:auto; margin-bottom:0;">
+          <option value="">All roles</option>
+          <option value="student">Students</option>
+          <option value="class_tutor">Class tutors</option>
+          <option value="hod">HODs</option>
+          <option value="admin">Admins</option>
+        </select>
+
+        <button type="button" onclick="toggleSelectAll()" style="width:auto;">Select all</button>
+        <button type="button" class="reject" onclick="deleteSelected()" style="width:auto;">Delete selected</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:30px;"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()" /></th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Department</th>
+              <th>Class</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="usersList">
+            <tr><td colspan="7">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    const currentUser = requireRole('admin');
+    if (currentUser) {
+      document.getElementById('welcomeText').textContent = `Welcome, ${currentUser.name}`;
+    }
+
+    // ---------- Create single user ----------
+    document.getElementById('createUserForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('createError');
+      errorBox.textContent = '';
+
+      const payload = {
+        name: document.getElementById('name').value,
+        email: document.getElementById('email').value,
+        password: document.getElementById('password').value,
+        role: document.getElementById('role').value,
+        department: document.getElementById('department').value,
+        className: document.getElementById('className').value,
+        regNo: document.getElementById('regNo').value,
+        parentName: document.getElementById('parentName').value,
+        parentPhone: document.getElementById('parentPhone').value,
+      };
+
+      try {
+        await apiFetch('/admin/users', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        document.getElementById('createUserForm').reset();
+        alert('Account created successfully');
+        loadUsers();
+      } catch (err) {
+        errorBox.textContent = err.message;
+      }
+    });
+
+    // ---------- File import (CSV / Excel) ----------
+    let parsedFileStudents = [];
+
+    function handleFileImport() {
+      const errorBox = document.getElementById('fileImportError');
+      const previewBox = document.getElementById('fileImportPreview');
+      errorBox.textContent = '';
+      previewBox.innerHTML = '';
+      parsedFileStudents = [];
+
+      const fileInput = document.getElementById('studentFileInput');
+      const file = fileInput.files[0];
+
+      if (!file) {
+        errorBox.textContent = 'Please choose a CSV or Excel file first';
+        return;
+      }
+
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+          if (!rows.length) {
+            errorBox.textContent = 'File appears to be empty';
+            return;
+          }
+
+          // Detect header row (case-insensitive check on first cell)
+          let dataRows = rows;
+          const firstCell = String(rows[0][0] || '').trim().toLowerCase();
+          if (firstCell === 'name') {
+            dataRows = rows.slice(1); // skip header row
+          }
+
+          const students = [];
+          const rowErrors = [];
+
+          dataRows.forEach((row, idx) => {
+            if (row.every((cell) => String(cell).trim() === '')) return; // skip blank rows
+
+            const [name, regNo, email, parentName, parentPhone, department, className] = row.map((c) =>
+              String(c).trim()
+            );
+
+            if (!name || !regNo || !email || !department || !className) {
+              rowErrors.push(`Row ${idx + 1}: missing required field(s)`);
+              return;
+            }
+
+            students.push({ name, regNo, email, parentName, parentPhone, department, className });
+          });
+
+          if (rowErrors.length) {
+            errorBox.innerHTML = rowErrors.join('<br/>');
+          }
+
+          parsedFileStudents = students;
+
+          previewBox.innerHTML = `
+            <strong>${students.length} student(s) ready to import.</strong>
+            <div class="table-wrap" style="margin-top:8px;">
+              <table>
+                <thead>
+                  <tr><th>Name</th><th>RegNo</th><th>Email</th><th>Parent</th><th>Phone</th><th>Dept</th><th>Class</th></tr>
+                </thead>
+                <tbody>
+                  ${students
+                    .slice(0, 5)
+                    .map(
+                      (s) => `<tr>
+                        <td>${s.name}</td><td>${s.regNo}</td><td>${s.email}</td>
+                        <td>${s.parentName || '-'}</td><td>${s.parentPhone || '-'}</td>
+                        <td>${s.department}</td><td>${s.className}</td>
+                      </tr>`
+                    )
+                    .join('')}
+                </tbody>
+              </table>
+            </div>
+            ${students.length > 5 ? `<p style="margin-top:6px;">...and ${students.length - 5} more.</p>` : ''}
+            <button type="button" onclick="confirmFileImport()" style="margin-top:10px;">Confirm and create ${students.length} account(s)</button>
+          `;
+        } catch (err) {
+          errorBox.textContent = 'Could not read file. Make sure it is a valid CSV or Excel file.';
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
+
+    async function confirmFileImport() {
+      const errorBox = document.getElementById('fileImportError');
+      const previewBox = document.getElementById('fileImportPreview');
+      errorBox.textContent = '';
+
+      if (!parsedFileStudents.length) {
+        errorBox.textContent = 'No students to import';
+        return;
+      }
+
+      try {
+        const data = await apiFetch('/admin/users/bulk', {
+          method: 'POST',
+          body: JSON.stringify({ users: parsedFileStudents }),
+        });
+
+        let html = `<strong>${data.message}</strong>`;
+        if (data.skipped.length) {
+          html += '<br/><br/><strong>Skipped:</strong><br/>';
+          html += data.skipped.map((s) => `${s.regNo} — ${s.reason}`).join('<br/>');
+        }
+        previewBox.innerHTML = html;
+
+        parsedFileStudents = [];
+        document.getElementById('studentFileInput').value = '';
+        loadUsers();
+      } catch (err) {
+        errorBox.textContent = err.message;
+      }
+    }
+
+    // ---------- Bulk add students (paste option) ----------
+    async function submitBulkStudents() {
+      const errorBox = document.getElementById('bulkError');
+      const resultBox = document.getElementById('bulkResult');
+      errorBox.textContent = '';
+      resultBox.textContent = '';
+
+      const department = document.getElementById('bulkDepartment').value.trim();
+      const className = document.getElementById('bulkClassName').value.trim();
+      const rawText = document.getElementById('bulkStudents').value.trim();
+
+      if (!department || !className) {
+        errorBox.textContent = 'Please fill department and class name';
+        return;
+      }
+      if (!rawText) {
+        errorBox.textContent = 'Please paste at least one student';
+        return;
+      }
+
+      const lines = rawText.split('\n').map((l) => l.trim()).filter(Boolean);
+      const users = [];
+      const parseErrors = [];
+
+      lines.forEach((line, idx) => {
+        const parts = line.split(',').map((p) => p.trim());
+        if (parts.length < 5) {
+          parseErrors.push(`Line ${idx + 1}: expected 5 fields (Name, RegNo, Email, ParentName, ParentPhone), got ${parts.length}`);
+          return;
+        }
+        const [name, regNo, email, parentName, parentPhone] = parts;
+        users.push({ name, regNo, email, parentName, parentPhone, department, className });
+      });
+
+      if (parseErrors.length) {
+        errorBox.innerHTML = parseErrors.join('<br/>');
+        return;
+      }
+
+      try {
+        const data = await apiFetch('/admin/users/bulk', {
+          method: 'POST',
+          body: JSON.stringify({ users }),
+        });
+
+        let html = `<strong>${data.message}</strong>`;
+        if (data.skipped.length) {
+          html += '<br/><br/><strong>Skipped:</strong><br/>';
+          html += data.skipped.map((s) => `${s.regNo} — ${s.reason}`).join('<br/>');
+        }
+        resultBox.innerHTML = html;
+
+        document.getElementById('bulkStudents').value = '';
+        loadUsers();
+      } catch (err) {
+        errorBox.textContent = err.message;
+      }
+    }
+
+    // ---------- Single delete ----------
+    async function deleteUser(id) {
+      if (!confirm('Are you sure you want to delete this user?')) return;
+      try {
+        await apiFetch(`/admin/users/${id}`, { method: 'DELETE' });
+        loadUsers();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // ---------- Select all / bulk delete ----------
+    function getSelectedIds() {
+      return Array.from(document.querySelectorAll('.user-checkbox:checked')).map((cb) => cb.value);
+    }
+
+    function toggleSelectAll() {
+      const selectAllBox = document.getElementById('selectAllCheckbox');
+      const checkboxes = document.querySelectorAll('.user-checkbox');
+      checkboxes.forEach((cb) => (cb.checked = selectAllBox.checked));
+    }
+
+    async function deleteSelected() {
+      const ids = getSelectedIds();
+
+      if (!ids.length) {
+        alert('No users selected');
+        return;
+      }
+
+      if (!confirm(`Delete ${ids.length} selected user(s)? This cannot be undone.`)) return;
+
+      try {
+        const data = await apiFetch('/admin/users/bulk', {
+          method: 'DELETE',
+          body: JSON.stringify({ ids }),
+        });
+        alert(data.message);
+        loadUsers();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // ---------- Load / render users table ----------
+    async function loadUsers() {
+      const tbody = document.getElementById('usersList');
+      const role = document.getElementById('roleFilter').value;
+      try {
+        const query = role ? `?role=${role}` : '';
+        const users = await apiFetch(`/admin/users${query}`);
+
+        if (!users.length) {
+          tbody.innerHTML = '<tr><td colspan="7">No users found.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = users
+          .map(
+            (u) => `
+            <tr>
+              <td><input type="checkbox" class="user-checkbox" value="${u._id}" /></td>
+              <td>${u.name}</td>
+              <td>${u.email}</td>
+              <td>${u.role}</td>
+              <td>${u.department || '-'}</td>
+              <td>${u.className || '-'}</td>
+              <td><button class="small reject" onclick="deleteUser('${u._id}')">Delete</button></td>
+            </tr>
+          `
+          )
+          .join('');
+
+        document.getElementById('selectAllCheckbox').checked = false;
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7" class="error">${err.message}</td></tr>`;
+      }
+    }
+
+    loadUsers();
+  </script>
+</body>
+</html>

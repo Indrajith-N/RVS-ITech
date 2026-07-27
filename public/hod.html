@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>HOD Dashboard</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <div class="container">
+    <div class="topbar">
+      <div>
+        <h1>HOD Dashboard</h1>
+        <p id="welcomeText" style="color: var(--ink-soft); font-size: 13px; margin-top: 2px;"></p>
+      </div>
+      <button onclick="logout()">Logout</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" id="odTabBtn" onclick="switchTab('od')">On-Duty (OD)</button>
+      <button class="tab-btn" id="leaveTabBtn" onclick="switchTab('leave')">Leave</button>
+    </div>
+
+    <!-- ===================== OD TAB ===================== -->
+    <div class="tab-content active" id="odTab">
+      <div class="card">
+        <h2>All OD applications — my department</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Event / Dates</th>
+                <th>Status</th>
+                <th>Proof status</th>
+                <th>Remarks</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="allApps">
+              <tr><td colspan="6">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== LEAVE TAB ===================== -->
+    <div class="tab-content" id="leaveTab">
+      <div class="card">
+        <h2>Leave applications — my department</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Reason / Dates</th>
+                <th>Tutor remarks</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="leaveList">
+              <tr><td colspan="5">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    const currentUser = requireRole('hod');
+    if (currentUser) {
+      document.getElementById('welcomeText').textContent = `Welcome, ${currentUser.name}`;
+    }
+
+    // ---------- Tab switching ----------
+    function switchTab(tab) {
+      document.getElementById('odTab').classList.toggle('active', tab === 'od');
+      document.getElementById('leaveTab').classList.toggle('active', tab === 'leave');
+      document.getElementById('odTabBtn').classList.toggle('active', tab === 'od');
+      document.getElementById('leaveTabBtn').classList.toggle('active', tab === 'leave');
+    }
+
+    // ---------- Print helpers ----------
+    function printOdSlip(app) {
+      const data = {
+        type: 'OD',
+        department: currentUser.department,
+        studentName: app.student.name,
+        className: app.student.className,
+        regNo: app.student.regNo,
+        eventName: app.eventName,
+        reason: app.reason,
+        fromDate: app.fromDate,
+        toDate: app.toDate,
+        tutorRemarks: app.tutorRemarks,
+        hodRemarks: app.hodRemarks,
+      };
+      sessionStorage.setItem('printSlipData', JSON.stringify(data));
+      window.open('print-slip.html', '_blank');
+    }
+
+    function printLeaveSlip(leave) {
+      const data = {
+        type: 'Leave',
+        department: currentUser.department,
+        studentName: leave.student.name,
+        className: leave.student.className,
+        regNo: leave.student.regNo,
+        reason: leave.reason,
+        fromDate: leave.fromDate,
+        toDate: leave.toDate,
+        parentName: leave.parentName,
+        parentMobile: leave.parentMobile,
+        parentVerified: leave.verificationCode?.verified,
+        tutorRemarks: leave.tutorRemarks,
+        hodRemarks: leave.hodRemarks,
+      };
+      sessionStorage.setItem('printSlipData', JSON.stringify(data));
+      window.open('print-slip.html', '_blank');
+    }
+
+    // ---------- OD ----------
+    async function approveApp(id) {
+      const remarks = prompt('Remarks (optional):', 'Approved');
+      try {
+        await apiFetch(`/hod/od/${id}/approve`, { method: 'PUT', body: JSON.stringify({ remarks }) });
+        loadAllOd();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function rejectApp(id) {
+      const remarks = prompt('Reason for rejection (required):');
+      if (!remarks) return;
+      try {
+        await apiFetch(`/hod/od/${id}/reject`, { method: 'PUT', body: JSON.stringify({ remarks }) });
+        loadAllOd();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function confirmProof(id) {
+      const remarks = prompt('Remarks (optional):', 'Confirmed valid');
+      try {
+        await apiFetch(`/hod/proof/${id}/confirm`, { method: 'PUT', body: JSON.stringify({ remarks }) });
+        alert('OD marked as Completed');
+        loadAllOd();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function rejectProof(id) {
+      const remarks = prompt('Reason for rejecting proof (required):');
+      if (!remarks) return;
+      try {
+        await apiFetch(`/hod/proof/${id}/reject`, { method: 'PUT', body: JSON.stringify({ remarks }) });
+        loadAllOd();
+      } catch (err) { alert(err.message); }
+    }
+
+    function renderOdRow(app) {
+      const proofStatus = app.proof?.verificationStatus || 'not_uploaded';
+
+      let actions = '-';
+      if (app.status === 'pending_hod') {
+        actions = `
+         <div style="display:flex; flex-direction:column; gap:8px;">
+          <button onclick="approveApp('${app._id}')">Approve</button>
+          <button class="reject" onclick="rejectApp('${app._id}')">Reject</button>
+        `;
+      } else if (proofStatus === 'pending_hod_verification') {
+        actions = `
+         <div style="display:flex; flex-direction:column; gap:8px;">
+          <a class="proof-link" href="http://localhost:5000${app.proof.fileUrl}" target="_blank">View proof</a><br/>
+          <button onclick="confirmProof('${app._id}')">Confirm</button>
+          <button class="reject" onclick="rejectProof('${app._id}')">Reject</button>
+        `;
+      } else if (proofStatus === 'completed') {
+  actions = `<button onclick='printOdSlip(${JSON.stringify(app).replace(/'/g, "&apos;")})'>🖨️ Print slip</button>`;
+}
+
+      const remarks = [
+        app.tutorRemarks ? `Tutor: ${app.tutorRemarks}` : '',
+        app.hodRemarks ? `You: ${app.hodRemarks}` : '',
+        app.proof?.tutorProofRemarks ? `Proof (tutor): ${app.proof.tutorProofRemarks}` : '',
+        app.proof?.hodProofRemarks ? `Proof (you): ${app.proof.hodProofRemarks}` : '',
+      ]
+        .filter(Boolean)
+        .map((r) => `<div class="remarks">${r}</div>`)
+        .join('');
+
+      return `
+        <tr>
+          <td><strong>${app.student.name}</strong><br/><span style="font-size:12px;color:#666">${app.student.className}</span></td>
+          <td>${app.eventName}<br/><span style="font-size:12px;color:#666">${new Date(app.fromDate).toLocaleDateString()} - ${new Date(app.toDate).toLocaleDateString()}</span></td>
+          <td><span class="status ${app.status}">${app.status}</span></td>
+          <td>${app.status === 'approved' ? `<span class="status ${proofStatus}">${proofStatus}</span>` : '-'}</td>
+          <td>${remarks || '-'}</td>
+          <td class="actions">${actions}</td>
+        </tr>
+      `;
+    }
+
+    async function loadAllOd() {
+      const tbody = document.getElementById('allApps');
+      try {
+        const apps = await apiFetch('/hod/od/all');
+        if (!apps.length) {
+          tbody.innerHTML = '<tr><td colspan="6">No applications yet.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = apps.map(renderOdRow).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="error">${err.message}</td></tr>`;
+      }
+    }
+
+    loadAllOd();
+
+    // ---------- Leave ----------
+    async function approveLeave(id) {
+      const remarks = prompt('Remarks (optional):', 'Approved');
+      try {
+        await apiFetch(`/hod/leave/${id}/approve`, { method: 'PUT', body: JSON.stringify({ remarks }) });
+        alert('Leave fully approved — student is permitted.');
+        loadAllLeave();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function rejectLeave(id) {
+      const remarks = prompt('Reason for rejection (required):');
+      if (!remarks) return;
+      try {
+        await apiFetch(`/hod/leave/${id}/reject`, { method: 'PUT', body: JSON.stringify({ remarks }) });
+        loadAllLeave();
+      } catch (err) { alert(err.message); }
+    }
+
+    function renderLeaveRow(leave) {
+      let actions = '-';
+      if (leave.status === 'pending_hod') {
+        actions = `
+         <div style="display:flex; flex-direction:column; gap:8px;">
+          <button onclick="approveLeave('${leave._id}')">Approve</button>
+          <button class="reject" onclick="rejectLeave('${leave._id}')">Reject</button>
+        `;
+      } else if (leave.status === 'approved') {
+        actions = `<button onclick='printLeaveSlip(${JSON.stringify(leave).replace(/'/g, "&apos;")})'>🖨️ Print slip</button>`;
+      }
+
+      return `
+        <tr>
+          <td><strong>${leave.student.name}</strong><br/><span style="font-size:12px;color:var(--ink-soft)">${leave.student.className}</span></td>
+          <td>${leave.reason}<br/><span style="font-size:12px;color:var(--ink-soft)">${new Date(leave.fromDate).toLocaleDateString()} - ${new Date(leave.toDate).toLocaleDateString()}</span></td>
+          <td class="remarks">${leave.tutorRemarks || '-'}</td>
+          <td><span class="status ${leave.status}">${leave.status.replace(/_/g, ' ')}</span></td>
+          <td class="actions">${actions}</td>
+        </tr>
+      `;
+    }
+
+    async function loadAllLeave() {
+      const tbody = document.getElementById('leaveList');
+      try {
+        const leaves = await apiFetch('/hod/leave/all');
+        if (!leaves.length) {
+          tbody.innerHTML = '<tr><td colspan="5">No leave applications yet.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = leaves.map(renderLeaveRow).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="error">${err.message}</td></tr>`;
+      }
+    }
+
+    loadAllLeave();
+  </script>
+</body>
+</html>

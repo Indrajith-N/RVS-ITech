@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Student Dashboard</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <div class="container">
+    <div class="topbar">
+      <div>
+        <h1>Student Dashboard</h1>
+        <p id="welcomeText" style="color: var(--ink-soft); font-size: 13px; margin-top: 2px;"></p>
+      </div>
+      <button onclick="logout()">Logout</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" id="odTabBtn" onclick="switchTab('od')">On-Duty (OD)</button>
+      <button class="tab-btn" id="leaveTabBtn" onclick="switchTab('leave')">Leave</button>
+    </div>
+
+    <!-- ===================== OD TAB ===================== -->
+    <div class="tab-content active" id="odTab">
+
+      <div class="stats-row" id="odStats"></div>
+
+      <div class="card">
+        <h2>Apply for OD</h2>
+        <div id="applyError" class="error"></div>
+        <form id="applyForm">
+          <input type="text" id="eventName" placeholder="Event name" required />
+          <input type="text" id="eventVenue" placeholder="Venue" />
+          <label>From date</label>
+          <input type="date" id="fromDate" required />
+          <label>To date</label>
+          <input type="date" id="toDate" required />
+          <textarea id="reason" placeholder="Reason" required></textarea>
+          <button type="submit">Submit application</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>My applications</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Dates</th>
+                <th>Application status</th>
+                <th>Proof status</th>
+                <th>Remarks</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="applicationsList">
+              <tr><td colspan="6">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===================== LEAVE TAB ===================== -->
+    <div class="tab-content" id="leaveTab">
+
+      <div class="stats-row" id="leaveStats"></div>
+
+      <div class="card">
+        <h2>Apply for leave (parent verified)</h2>
+        <div id="leaveError" class="error"></div>
+        <form id="leaveForm">
+  <label>Reason</label>
+  <textarea id="leaveReason" placeholder="Reason for leave" required></textarea>
+  <label>From date</label>
+  <input type="date" id="leaveFromDate" required />
+  <label>To date</label>
+  <input type="date" id="leaveToDate" required />
+
+  <label>Parent / Guardian name (on file)</label>
+  <input type="text" id="parentNameDisplay" readonly style="background: var(--neutral-bg); cursor: not-allowed;" />
+
+  <label>Parent's mobile number (on file)</label>
+  <input type="text" id="parentMobileDisplay" readonly style="background: var(--neutral-bg); cursor: not-allowed;" />
+
+  <p style="font-size:12px; color:var(--ink-soft); margin-top:-8px; margin-bottom:14px;">
+    These details are set by admin and cannot be edited here. If incorrect, contact admin to update your profile.
+  </p>
+
+  <button type="submit">Send for verification</button>
+</form>
+      </div>
+
+      <div class="card">
+        <h2>My leave applications</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Reason</th>
+                <th>Dates</th>
+                <th>Parent</th>
+                <th>Status</th>
+                <th>Remarks</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="leaveList">
+              <tr><td colspan="6">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    const currentUser = requireRole('student');
+    if (currentUser) {
+      document.getElementById('welcomeText').textContent = `Welcome, ${currentUser.name}`;
+       document.getElementById('parentNameDisplay').value = currentUser.parentName || 'Not on file - contact admin';
+  document.getElementById('parentMobileDisplay').value = currentUser.parentPhone || 'Not on file - contact admin';
+    }
+
+    // ---------- Tab switching ----------
+    function switchTab(tab) {
+      document.getElementById('odTab').classList.toggle('active', tab === 'od');
+      document.getElementById('leaveTab').classList.toggle('active', tab === 'leave');
+      document.getElementById('odTabBtn').classList.toggle('active', tab === 'od');
+      document.getElementById('leaveTabBtn').classList.toggle('active', tab === 'leave');
+    }
+
+    // ---------- Print helper ----------
+    function printSlip(item, type) {
+      const data = {
+        type,
+        department: currentUser.department,
+        studentName: currentUser.name,
+        className: currentUser.className,
+        regNo: currentUser.regNo,
+        eventName: item.eventName,
+        reason: item.reason,
+        fromDate: item.fromDate,
+        toDate: item.toDate,
+        parentName: item.parentName,
+        parentMobile: item.parentMobile,
+        parentVerified: item.verificationCode?.verified,
+        tutorRemarks: item.tutorRemarks,
+        hodRemarks: item.hodRemarks,
+      };
+      sessionStorage.setItem('printSlipData', JSON.stringify(data));
+      window.open('print-slip.html', '_blank');
+    }
+
+    // ---------- OD application ----------
+    let isSubmittingOd = false;
+
+    document.getElementById('applyForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (isSubmittingOd) return;
+      isSubmittingOd = true;
+
+      const errorBox = document.getElementById('applyError');
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      errorBox.textContent = '';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+
+      const payload = {
+        eventName: document.getElementById('eventName').value,
+        eventVenue: document.getElementById('eventVenue').value,
+        fromDate: document.getElementById('fromDate').value,
+        toDate: document.getElementById('toDate').value,
+        reason: document.getElementById('reason').value,
+      };
+
+      try {
+        await apiFetch('/student/od/apply', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        document.getElementById('applyForm').reset();
+        loadApplications();
+      } catch (err) {
+        errorBox.textContent = err.message;
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit application';
+        isSubmittingOd = false;
+      }
+    });
+
+    async function uploadProof(appId) {
+      const fileInput = document.getElementById(`file-${appId}`);
+      if (!fileInput.files.length) {
+        alert('Please choose a file first');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('proof', fileInput.files[0]);
+
+      try {
+        await apiFetch(`/student/od/${appId}/upload-proof`, {
+          method: 'POST',
+          body: formData,
+        });
+        alert('Proof uploaded successfully');
+        loadApplications();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function renderRow(app) {
+      const proofStatus = app.proof?.verificationStatus || 'not_uploaded';
+      const canUploadProof =
+        app.status === 'approved' && ['not_uploaded', 'rejected'].includes(proofStatus);
+
+      const remarks = [
+        app.tutorRemarks ? `Tutor: ${app.tutorRemarks}` : '',
+        app.hodRemarks ? `HOD: ${app.hodRemarks}` : '',
+        app.proof?.tutorProofRemarks ? `Proof (tutor): ${app.proof.tutorProofRemarks}` : '',
+        app.proof?.hodProofRemarks ? `Proof (HOD): ${app.proof.hodProofRemarks}` : '',
+      ]
+        .filter(Boolean)
+        .map((r) => `<div class="remarks">${r}</div>`)
+        .join('');
+
+      let actionCell = '-';
+      if (canUploadProof) {
+        actionCell = `
+          <input type="file" id="file-${app._id}" style="margin-bottom:4px" />
+          <button onclick="uploadProof('${app._id}')">Upload proof</button>
+        `;
+      } else if (proofStatus === 'completed'){
+        actionCell = `<button onclick='printSlip(${JSON.stringify(app).replace(/'/g, "&apos;")}, "OD")'>🖨️ Print</button>`;
+      }
+
+      return `
+        <tr>
+          <td><strong>${app.eventName}</strong><br/><span style="font-size:12px;color:#666">${app.reason}</span></td>
+          <td>${new Date(app.fromDate).toLocaleDateString()}<br/>to ${new Date(app.toDate).toLocaleDateString()}</td>
+          <td><span class="status ${app.status}">${app.status}</span></td>
+          <td>${app.status === 'approved' ? `<span class="status ${proofStatus}">${proofStatus}</span>` : '-'}</td>
+          <td>${remarks || '-'}</td>
+          <td class="actions">${actionCell}</td>
+        </tr>
+      `;
+    }
+
+    function renderOdStats(applications) {
+      const total = applications.length;
+      const pending = applications.filter((a) =>
+        ['pending_tutor', 'pending_hod'].includes(a.status)
+      ).length;
+      const approved = applications.filter((a) => a.status === 'approved').length;
+      const completed = applications.filter(
+        (a) => a.proof?.verificationStatus === 'completed'
+      ).length;
+      const rejected = applications.filter((a) => a.status === 'rejected').length;
+
+      document.getElementById('odStats').innerHTML = `
+        <div class="stat-box"><span class="stat-number">${total}</span><span class="stat-label">Total</span></div>
+        <div class="stat-box"><span class="stat-number">${pending}</span><span class="stat-label">Pending</span></div>
+        <div class="stat-box"><span class="stat-number">${approved}</span><span class="stat-label">Approved</span></div>
+        <div class="stat-box"><span class="stat-number">${completed}</span><span class="stat-label">Completed</span></div>
+        <div class="stat-box"><span class="stat-number">${rejected}</span><span class="stat-label">Rejected</span></div>
+      `;
+    }
+
+    async function loadApplications() {
+      const tbody = document.getElementById('applicationsList');
+      try {
+        const applications = await apiFetch('/student/od/my-applications');
+        renderOdStats(applications);
+
+        if (!applications.length) {
+          tbody.innerHTML = '<tr><td colspan="6">No applications yet.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = applications.map(renderRow).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="error">${err.message}</td></tr>`;
+      }
+    }
+
+    loadApplications();
+
+    // ---------- Leave application ----------
+    let isSubmittingLeave = false;
+
+    document.getElementById('leaveForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (isSubmittingLeave) return;
+  isSubmittingLeave = true;
+
+  const errorBox = document.getElementById('leaveError');
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  errorBox.textContent = '';
+
+  if (!currentUser.parentName || !currentUser.parentPhone) {
+    errorBox.textContent = 'Your parent details are not on file. Please contact admin before applying for leave.';
+    isSubmittingLeave = false;
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Submitting...';
+
+  const payload = {
+    reason: document.getElementById('leaveReason').value,
+    fromDate: document.getElementById('leaveFromDate').value,
+    toDate: document.getElementById('leaveToDate').value,
+  };
+
+  try {
+    const data = await apiFetch('/student/leave/apply', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    alert(data.message);
+    document.getElementById('leaveForm').reset();
+    // Re-fill parent display fields after reset clears them
+    document.getElementById('parentNameDisplay').value = currentUser.parentName;
+    document.getElementById('parentMobileDisplay').value = currentUser.parentPhone;
+    loadLeaveApplications();
+  } catch (err) {
+    errorBox.textContent = err.message;
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Send for verification';
+    isSubmittingLeave = false;
+  }
+});
+
+    function renderLeaveRow(leave) {
+      const remarks = [
+        leave.tutorRemarks ? `Tutor: ${leave.tutorRemarks}` : '',
+        leave.hodRemarks ? `HOD: ${leave.hodRemarks}` : '',
+      ]
+        .filter(Boolean)
+        .map((r) => `<div class="remarks">${r}</div>`)
+        .join('');
+
+      const actionCell =
+        leave.status === 'approved'
+          ? `<button onclick='printSlip(${JSON.stringify(leave).replace(/'/g, "&apos;")}, "Leave")'>🖨️ Print</button>`
+          : '-';
+
+      return `
+        <tr>
+          <td>${leave.reason}</td>
+          <td>${new Date(leave.fromDate).toLocaleDateString()}<br/>to ${new Date(leave.toDate).toLocaleDateString()}</td>
+          <td>${leave.parentName}<br/><span style="font-size:12px;color:var(--ink-soft)">${leave.parentMobile}</span></td>
+          <td><span class="status ${leave.status}">${leave.status.replace(/_/g, ' ')}</span></td>
+          <td>${remarks || '-'}</td>
+          <td class="actions">${actionCell}</td>
+        </tr>
+      `;
+    }
+
+    function renderLeaveStats(leaves) {
+      const total = leaves.length;
+      const pending = leaves.filter((l) =>
+        ['pending_verification', 'pending_hod'].includes(l.status)
+      ).length;
+      const approved = leaves.filter((l) => l.status === 'approved').length;
+      const rejected = leaves.filter((l) => l.status === 'rejected').length;
+
+      document.getElementById('leaveStats').innerHTML = `
+        <div class="stat-box"><span class="stat-number">${total}</span><span class="stat-label">Total</span></div>
+        <div class="stat-box"><span class="stat-number">${pending}</span><span class="stat-label">Pending</span></div>
+        <div class="stat-box"><span class="stat-number">${approved}</span><span class="stat-label">Approved</span></div>
+        <div class="stat-box"><span class="stat-number">${rejected}</span><span class="stat-label">Rejected</span></div>
+      `;
+    }
+
+    async function loadLeaveApplications() {
+      const tbody = document.getElementById('leaveList');
+      try {
+        const leaves = await apiFetch('/student/leave/my-applications');
+        renderLeaveStats(leaves);
+
+        if (!leaves.length) {
+          tbody.innerHTML = '<tr><td colspan="6">No leave applications yet.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = leaves.map(renderLeaveRow).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="error">${err.message}</td></tr>`;
+      }
+    }
+
+    loadLeaveApplications();
+  </script>
+</body>
+</html>

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Approval Slip</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Times New Roman', Times, serif;
+      color: #000;
+      background: #fff;
+      padding: 30px 40px;
+    }
+    .letterhead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 3px solid #000;
+      padding-bottom: 10px;
+      margin-bottom: 6px;
+    }
+    .letterhead img { height: 80px; }
+    .letterhead-text { text-align: center; flex: 1; padding: 0 10px; }
+    .letterhead-text h1 {
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .letterhead-text p {
+      font-size: 11px;
+      line-height: 1.5;
+    }
+    .doc-title {
+      text-align: center;
+      font-size: 16px;
+      font-weight: bold;
+      text-decoration: underline;
+      margin: 18px 0 20px;
+    }
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+    table.details {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+    table.details td {
+      padding: 10px 8px;
+      border: 1px solid #000;
+    }
+    table.details td.label {
+      font-weight: bold;
+      width: 260px;
+      background: #f2f2f2;
+    }
+    .signatures {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 60px;
+      font-size: 13px;
+    }
+    .signature-block { text-align: center; width: 30%; }
+    .signature-line {
+      border-top: 1px solid #000;
+      margin-top: 50px;
+      padding-top: 6px;
+    }
+    .print-bar {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .print-bar button {
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: bold;
+      background: #2C3E66;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .status-approved {
+      display: inline-block;
+      border: 2px solid #16a34a;
+      color: #16a34a;
+      font-weight: bold;
+      padding: 4px 14px;
+      border-radius: 4px;
+      transform: rotate(-3deg);
+    }
+
+    /* Hide the print button and browser chrome when actually printing */
+    @media print {
+      .print-bar { display: none; }
+      body { padding: 0 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="print-bar">
+    <button onclick="window.print()">🖨️ Print / Save as PDF</button>
+  </div>
+
+  <div class="letterhead">
+    <img src="images/logo-left.jpg" alt="College logo left" />
+    <div class="letterhead-text">
+      <h1>RVS INSTITUTE OF TECHNOLOGY — COIMBATORE</h1>
+      <p>
+        Approved by AICTE, New Delhi &amp; Affiliated to Anna University, Chennai.<br/>
+        Accredited by NAAC and ISO 21001:2018 Certified Institution.<br/>
+        Kumaran Kottam Campus, Trichy Road, Kannampalayam, Coimbatore – 641 402.<br/>
+        Ph: 89039 49934, 0422-2681123, Fax: 0422-2680047, 2687200<br/>
+        E-mail: rvsetgi@rvsgroup.com &nbsp; Website: www.rvstcc.ac.in
+      </p>
+    </div>
+    <img src="images/logo-right.jpg" alt="College logo right" />
+  </div>
+
+  <div class="doc-title" id="docTitle">APPROVAL SLIP</div>
+
+  <div class="meta-row">
+    <div><strong>Department:</strong> <span id="metaDept"></span></div>
+    <div><strong>Type:</strong> <span id="metaType"></span></div>
+  </div>
+
+  <table class="details">
+    <tr>
+      <td class="label">Student Name</td>
+      <td id="studentName"></td>
+    </tr>
+    <tr>
+      <td class="label">Class</td>
+      <td id="studentClass"></td>
+    </tr>
+    <tr>
+      <td class="label">Register Number</td>
+      <td id="regNo"></td>
+    </tr>
+    <tr>
+      <td class="label" id="typeRowLabel">OD / Leave</td>
+      <td id="typeRowValue"></td>
+    </tr>
+    <tr>
+      <td class="label">Reason</td>
+      <td id="reason"></td>
+    </tr>
+    <tr>
+      <td class="label">From Date</td>
+      <td id="fromDate"></td>
+    </tr>
+    <tr>
+      <td class="label">To Date</td>
+      <td id="toDate"></td>
+    </tr>
+    <tr id="parentNameRow" style="display:none;">
+      <td class="label">Parent Name (Leave only)</td>
+      <td id="parentName"></td>
+    </tr>
+    <tr id="parentMobileRow" style="display:none;">
+      <td class="label">Parent Mobile (Leave only)</td>
+      <td id="parentMobile"></td>
+    </tr>
+    <tr id="parentVerifiedRow" style="display:none;">
+      <td class="label">Approved by Parent</td>
+      <td id="parentVerified"></td>
+    </tr>
+    <tr>
+      <td class="label">Class Tutor Remarks</td>
+      <td id="tutorRemarks"></td>
+    </tr>
+    <tr>
+      <td class="label">HOD Remarks</td>
+      <td id="hodRemarks"></td>
+    </tr>
+    <tr>
+      <td class="label">Final Status</td>
+      <td><span class="status-approved">APPROVED</span></td>
+    </tr>
+  </table>
+
+  <div class="signatures">
+    <div class="signature-block">
+      <div class="signature-line">Student Signature</div>
+    </div>
+    <div class="signature-block">
+      <div class="signature-line">Class Tutor Signature</div>
+    </div>
+    <div class="signature-block">
+      <div class="signature-line">HOD Signature</div>
+    </div>
+  </div>
+
+  <script>
+    const raw = sessionStorage.getItem('printSlipData');
+    if (!raw) {
+      document.body.innerHTML = '<p style="padding:40px;font-family:sans-serif;">No approval data found. Please go back and click "Print slip" again from the dashboard.</p>';
+    } else {
+      const data = JSON.parse(raw);
+
+      document.getElementById('docTitle').textContent =
+        data.type === 'OD' ? 'ON-DUTY APPROVAL SLIP' : 'LEAVE APPROVAL SLIP';
+
+      document.getElementById('metaDept').textContent = data.department || '-';
+      document.getElementById('metaType').textContent = data.type;
+
+      document.getElementById('studentName').textContent = data.studentName || '-';
+      document.getElementById('studentClass').textContent = data.className || '-';
+      document.getElementById('regNo').textContent = data.regNo || '-';
+      document.getElementById('typeRowLabel').textContent = data.type === 'OD' ? 'Event Name' : 'Leave Type';
+      document.getElementById('typeRowValue').textContent = data.eventName || data.type;
+      document.getElementById('reason').textContent = data.reason || '-';
+      document.getElementById('fromDate').textContent = data.fromDate ? new Date(data.fromDate).toLocaleDateString() : '-';
+      document.getElementById('toDate').textContent = data.toDate ? new Date(data.toDate).toLocaleDateString() : '-';
+
+      if (data.type === 'Leave') {
+        document.getElementById('parentNameRow').style.display = '';
+        document.getElementById('parentMobileRow').style.display = '';
+        document.getElementById('parentVerifiedRow').style.display = '';
+        document.getElementById('parentName').textContent = data.parentName || '-';
+        document.getElementById('parentMobile').textContent = data.parentMobile || '-';
+        document.getElementById('parentVerified').textContent = data.parentVerified ? 'Yes' : 'No';
+      }
+
+      document.getElementById('tutorRemarks').textContent = data.tutorRemarks || '-';
+      document.getElementById('hodRemarks').textContent = data.hodRemarks || '-';
+    }
+  </script>
+</body>
+</html>

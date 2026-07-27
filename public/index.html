@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- 
+  ════════════════════════════════════
+  Developed by Indrajith N
+  OD & Leave Management System
+  ════════════════════════════════════
+-->
+<meta name="developer" content="Indrajith N" />
+  <title>OD & Leave Management - Login</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <div class="auth-decor auth-decor-tl" aria-hidden="true">
+    <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10 190 C 10 120, 40 90, 100 90 C 60 90, 30 60, 30 10" stroke="currentColor" stroke-width="1.5" fill="none"/>
+      <path d="M100 90 C 100 40, 130 20, 180 20" stroke="currentColor" stroke-width="1.5" fill="none"/>
+      <circle cx="30" cy="10" r="4" fill="currentColor"/>
+      <circle cx="180" cy="20" r="4" fill="currentColor"/>
+      <circle cx="10" cy="190" r="4" fill="currentColor"/>
+      <path d="M100 90 c -8 -14, -8 -26, 4 -34 c 12 8, 12 20, 4 34 c 8 -14, 20 -18, 32 -12 c -4 14, -16 20, -32 12 c 14 6, 20 18, 16 32 c -14 -2, -22 -14, -20 -32 c -6 14, -18 20, -32 14 c 4 -14, 16 -20, 28 -14 z" fill="currentColor" opacity="0.5"/>
+    </svg>
+  </div>
+
+  <div class="auth-decor auth-decor-br" aria-hidden="true">
+    <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M190 10 C 190 80, 160 110, 100 110 C 140 110, 170 140, 170 190" stroke="currentColor" stroke-width="1.5" fill="none"/>
+      <path d="M100 110 C 100 160, 70 180, 20 180" stroke="currentColor" stroke-width="1.5" fill="none"/>
+      <circle cx="170" cy="190" r="4" fill="currentColor"/>
+      <circle cx="20" cy="180" r="4" fill="currentColor"/>
+      <circle cx="190" cy="10" r="4" fill="currentColor"/>
+      <path d="M100 110 c 8 14, 8 26, -4 34 c -12 -8, -12 -20, -4 -34 c -8 14, -20 18, -32 12 c 4 -14, 16 -20, 32 -12 c -14 -6, -20 -18, -16 -32 c 14 2, 22 14, 20 32 c 6 -14, 18 -20, 32 -14 c -4 14, -16 20, -28 14 z" fill="currentColor" opacity="0.5"/>
+    </svg>
+  </div>
+
+  <div class="container auth-wrap">
+    <div class="auth-card">
+
+      <div class="login-letterhead">
+        <img src="images/logo-left.jpg" alt="College logo left" />
+        <h1>RVS INSTITUTE OF TECHNOLOGY COIMBATORE</h1>
+        <img src="images/logo-right.jpg" alt="College logo right" />
+      </div>
+
+      <h2 style="text-align: center;">◈ On-Duty &amp; Leave Management ◈</h2>
+      <p class="subtitle">Sign in to continue</p>
+
+      <div class="card">
+        <div id="errorBox" class="error"></div>
+        <form id="loginForm">
+          <label>Email or Register Number</label>
+          <input type="text" id="identifier" placeholder="you@college.edu or 21CSE045" required />
+          <label>Password</label>
+          <input type="password" id="password" placeholder="••••••••" required />
+          <button type="submit">Sign in</button>
+        </form>
+      </div>
+
+      <p class="auth-footnote">Access is provisioned by your department administrator.</p>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    console.log(
+  '%c◈ OD & Leave Management System %c\nDesigned & Developed by Indrajith N',
+  'color:#2C3E66; font-size:16px; font-weight:bold;',
+  'color:#A9812F; font-size:12px; font-style:italic;'
+);
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const identifier = document.getElementById('identifier').value;
+      const password = document.getElementById('password').value;
+      const errorBox = document.getElementById('errorBox');
+      errorBox.textContent = '';
+
+      try {
+        const data = await apiFetch('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ identifier, password }),
+        });
+        saveSession(data);
+
+        if (data.role === 'student') window.location.href = 'student.html';
+        else if (data.role === 'class_tutor') window.location.href = 'tutor.html';
+        else if (data.role === 'hod') window.location.href = 'hod.html';
+        else if (data.role === 'admin') window.location.href = 'admin.html';
+      } catch (err) {
+        errorBox.textContent = err.message;
+      }
+    });
+  </script>
+</body>
+</html>
