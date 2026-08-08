@@ -175,7 +175,7 @@
       } else if (proofStatus === 'pending_tutor_verification') {
         actions = `
          <div style="display:flex; flex-direction:column; gap:8px;">
-          <a class="proof-link" href="http://localhost:5000${app.proof.fileUrl}" target="_blank">View proof</a>
+          <a class="proof-link" href="https://rvs-itech.onrender.com${app.proof.fileUrl}" target="_blank">View proof</a>
           <button onclick="verifyProof('${app._id}')">Verify</button>
           <button class="reject" onclick="rejectProof('${app._id}')">Reject</button>
         `;

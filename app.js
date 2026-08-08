@@ -17,7 +17,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 app.get('/', (req, res) => {
-  res.json({ message: 'OD Management System API is running' });
+  res.redirect('/index.html');
 });
 
 app.use('/api/auth', authRoutes);

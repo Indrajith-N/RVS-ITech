@@ -1,4 +1,4 @@
-const API_BASE = "https://rvs-itech.onrender.com";
+const API_BASE = 'https://rvs-itech.onrender.com/api';
 
 function getToken() {
   return sessionStorage.getItem('od_token');
